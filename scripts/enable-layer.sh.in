@@ -1,0 +1,8 @@
+#!/bin/bash
+# Enable @LAYER_NAME@ as implicit OpenXR layer (auto-loads)
+set -e
+LAYER_DIR="$HOME/.local/share/openxr/1/api_layers/implicit.d"
+mkdir -p "$LAYER_DIR"
+cp "$(dirname "$0")/@LAYER_NAME@.json" "$LAYER_DIR/"
+echo "✓ @LAYER_NAME@ enabled (implicit)"
+echo "To disable: export DISABLE_@LAYER_NAME@=1"

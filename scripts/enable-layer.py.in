@@ -1,0 +1,181 @@
+#!/usr/bin/env python3
+"""
+Enable @LAYER_NAME@ OpenXR API Layer
+Cross-platform script for registering OpenXR API layers
+"""
+
+import sys
+import os
+import shutil
+import argparse
+from pathlib import Path
+
+LAYER_NAME = "@LAYER_NAME@"
+LAYER_LIBRARY_NAME = "@LAYER_LIBRARY_NAME@"
+OPENXR_API_VERSION = "1"
+
+def get_script_dir():
+    """Get the directory containing this script"""
+    return Path(__file__).parent.absolute()
+
+def get_manifest_path():
+    """Get the path to the manifest JSON file"""
+    script_dir = get_script_dir()
+    manifest_path = script_dir / f"{LAYER_NAME}.json"
+    if not manifest_path.exists():
+        print(f"Error: Manifest file not found: {manifest_path}")
+        sys.exit(1)
+    return manifest_path
+
+def get_library_path():
+    """Get the path to the layer library"""
+    script_dir = get_script_dir()
+    library_path = script_dir / LAYER_LIBRARY_NAME
+    if not library_path.exists():
+        print(f"Error: Layer library not found: {library_path}")
+        sys.exit(1)
+    return library_path
+
+def enable_layer_windows(layer_type='explicit', scope='user'):
+    """Enable layer on Windows by adding registry entry"""
+    try:
+        import winreg
+    except ImportError:
+        print("Error: winreg module not available (not on Windows?)")
+        sys.exit(1)
+
+    manifest_path = get_manifest_path()
+
+    # Determine registry root and key path
+    if scope == 'system':
+        root_key = winreg.HKEY_LOCAL_MACHINE
+        key_prefix = "HKEY_LOCAL_MACHINE"
+    else:
+        root_key = winreg.HKEY_CURRENT_USER
+        key_prefix = "HKEY_CURRENT_USER"
+
+    # Build registry path
+    layer_type_suffix = "Implicit" if layer_type == 'implicit' else "Explicit"
+    key_path = f"SOFTWARE\\Khronos\\OpenXR\\{OPENXR_API_VERSION}\\ApiLayers\\{layer_type_suffix}"
+
+    print(f"Enabling OpenXR API Layer: {LAYER_NAME}")
+    print(f"  Manifest: {manifest_path}")
+    print(f"  Registry: {key_prefix}\\{key_path}")
+    print()
+
+    try:
+        # Create/open the registry key
+        key = winreg.CreateKey(root_key, key_path)
+
+        # Set the manifest path as value name with DWORD 0 (enabled)
+        winreg.SetValueEx(key, str(manifest_path), 0, winreg.REG_DWORD, 0)
+
+        winreg.CloseKey(key)
+
+        print(f"✓ Layer registered in Windows registry")
+        print()
+
+        if layer_type == 'explicit':
+            print("To use the layer, set the environment variable:")
+            print(f"  set XR_ENABLE_API_LAYERS={LAYER_NAME}")
+        else:
+            print("Layer will be auto-loaded (implicit layer)")
+            print(f"To disable, set: set DISABLE_{LAYER_NAME}=1")
+
+    except PermissionError:
+        print("Error: Permission denied. Try running as Administrator for system-wide installation.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: Failed to write registry: {e}")
+        sys.exit(1)
+
+def enable_layer_linux(layer_type='explicit', scope='user'):
+    """Enable layer on Linux by copying manifest to appropriate directory"""
+    manifest_path = get_manifest_path()
+
+    # Determine target directory
+    if scope == 'system':
+        if layer_type == 'implicit':
+            target_dir = Path(f"/usr/local/share/openxr/{OPENXR_API_VERSION}/api_layers/implicit.d")
+        else:
+            target_dir = Path(f"/usr/local/share/openxr/{OPENXR_API_VERSION}/api_layers/explicit.d")
+    else:
+        home = Path.home()
+        if layer_type == 'implicit':
+            target_dir = home / f".local/share/openxr/{OPENXR_API_VERSION}/api_layers/implicit.d"
+        else:
+            target_dir = home / f".local/share/openxr/{OPENXR_API_VERSION}/api_layers/explicit.d"
+
+    print(f"Enabling OpenXR API Layer: {LAYER_NAME}")
+    print(f"  Manifest: {manifest_path}")
+    print(f"  Target:   {target_dir}")
+    print()
+
+    try:
+        # Create directory if it doesn't exist
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        # Copy manifest file
+        target_file = target_dir / f"{LAYER_NAME}.json"
+        shutil.copy2(manifest_path, target_file)
+
+        print(f"✓ Layer installed to {target_dir}")
+        print()
+
+        if layer_type == 'explicit':
+            print("To use the layer, set the environment variable:")
+            print(f"  export XR_ENABLE_API_LAYERS={LAYER_NAME}")
+        else:
+            print("Layer will be auto-loaded (implicit layer)")
+            print(f"To disable, set: export DISABLE_{LAYER_NAME}=1")
+
+    except PermissionError:
+        print(f"Error: Permission denied. Try running with sudo for system-wide installation.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: Failed to install layer: {e}")
+        sys.exit(1)
+
+def main():
+    parser = argparse.ArgumentParser(
+        description=f"Enable {LAYER_NAME} OpenXR API Layer",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Layer Types:
+  explicit  - Must be explicitly enabled via XR_ENABLE_API_LAYERS (default)
+  implicit  - Automatically loaded by all OpenXR applications
+
+Scope:
+  user      - Install for current user only (default)
+  system    - Install system-wide (requires admin/sudo)
+
+Examples:
+  python enable-layer.py                    # User explicit layer
+  python enable-layer.py --implicit         # User implicit layer (auto-load)
+  python enable-layer.py --system           # System-wide explicit layer
+  python enable-layer.py --implicit --system # System-wide implicit layer
+        """
+    )
+
+    parser.add_argument('--implicit', action='store_true',
+                        help='Install as implicit layer (auto-loaded)')
+    parser.add_argument('--system', action='store_true',
+                        help='Install system-wide (requires admin/sudo)')
+
+    args = parser.parse_args()
+
+    layer_type = 'implicit' if args.implicit else 'explicit'
+    scope = 'system' if args.system else 'user'
+
+    # Verify files exist
+    get_manifest_path()
+    get_library_path()
+
+    # Platform-specific installation
+    if sys.platform == 'win32':
+        enable_layer_windows(layer_type, scope)
+    else:  # Linux, macOS, etc.
+        enable_layer_linux(layer_type, scope)
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""
+Disable @LAYER_NAME@ OpenXR API Layer
+Cross-platform script for unregistering OpenXR API layers
+"""
+
+import sys
+import os
+from pathlib import Path
+
+LAYER_NAME = "@LAYER_NAME@"
+OPENXR_API_VERSION = "1"
+
+def disable_layer_windows():
+    """Disable layer on Windows by removing registry entries"""
+    try:
+        import winreg
+    except ImportError:
+        print("Error: winreg module not available (not on Windows?)")
+        sys.exit(1)
+
+    print(f"Disabling OpenXR API Layer: {LAYER_NAME}")
+    print()
+
+    removed_count = 0
+
+    # Try both user and system registries, both implicit and explicit
+    registry_locations = [
+        (winreg.HKEY_CURRENT_USER, "HKEY_CURRENT_USER", "user"),
+        (winreg.HKEY_LOCAL_MACHINE, "HKEY_LOCAL_MACHINE", "system"),
+    ]
+
+    layer_types = ['Explicit', 'Implicit']
+
+    for root_key, root_name, scope in registry_locations:
+        for layer_type in layer_types:
+            key_path = f"SOFTWARE\\Khronos\\OpenXR\\{OPENXR_API_VERSION}\\ApiLayers\\{layer_type}"
+
+            try:
+                # Open the registry key
+                key = winreg.OpenKey(root_key, key_path, 0, winreg.KEY_ALL_ACCESS)
+
+                # Enumerate all values to find our manifest
+                i = 0
+                values_to_delete = []
+                try:
+                    while True:
+                        value_name, value_data, value_type = winreg.EnumValue(key, i)
+                        # Check if this value name contains our layer name
+                        if LAYER_NAME in value_name and value_name.endswith('.json'):
+                            values_to_delete.append(value_name)
+                        i += 1
+                except OSError:
+                    # No more values
+                    pass
+
+                # Delete found values
+                for value_name in values_to_delete:
+                    try:
+                        winreg.DeleteValue(key, value_name)
+                        print(f"Removed from {root_name}\\{key_path}")
+                        print(f"  Value: {value_name}")
+                        removed_count += 1
+                    except Exception as e:
+                        print(f"Warning: Failed to delete {value_name}: {e}")
+
+                winreg.CloseKey(key)
+
+            except FileNotFoundError:
+                # Registry key doesn't exist, skip
+                pass
+            except PermissionError:
+                print(f"Warning: Permission denied for {root_name}\\{key_path}")
+                print("  Try running as Administrator to remove system-wide layers")
+
+    if removed_count > 0:
+        print()
+        print(f"✓ Layer disabled ({removed_count} registry entries removed)")
+        print()
+        print("Note: You may also want to unset environment variables:")
+        print(f"  set XR_ENABLE_API_LAYERS=")
+        print(f"  set DISABLE_{LAYER_NAME}=")
+    else:
+        print("Layer not found in Windows registry")
+
+def disable_layer_linux():
+    """Disable layer on Linux by removing manifest files"""
+    print(f"Disabling OpenXR API Layer: {LAYER_NAME}")
+    print()
+
+    removed_count = 0
+    manifest_filename = f"{LAYER_NAME}.json"
+
+    # Check all possible locations
+    search_locations = [
+        # User locations
+        Path.home() / f".local/share/openxr/{OPENXR_API_VERSION}/api_layers/explicit.d",
+        Path.home() / f".local/share/openxr/{OPENXR_API_VERSION}/api_layers/implicit.d",
+
+        # System locations
+        Path(f"/usr/local/share/openxr/{OPENXR_API_VERSION}/api_layers/explicit.d"),
+        Path(f"/usr/local/share/openxr/{OPENXR_API_VERSION}/api_layers/implicit.d"),
+        Path(f"/usr/share/openxr/{OPENXR_API_VERSION}/api_layers/explicit.d"),
+        Path(f"/usr/share/openxr/{OPENXR_API_VERSION}/api_layers/implicit.d"),
+        Path(f"/etc/openxr/{OPENXR_API_VERSION}/api_layers/explicit.d"),
+        Path(f"/etc/openxr/{OPENXR_API_VERSION}/api_layers/implicit.d"),
+    ]
+
+    for location in search_locations:
+        manifest_path = location / manifest_filename
+        if manifest_path.exists():
+            try:
+                manifest_path.unlink()
+                print(f"Removed from: {location}")
+                removed_count += 1
+            except PermissionError:
+                print(f"Permission denied: {location}")
+                print("  Try running with sudo to remove system-wide layers")
+            except Exception as e:
+                print(f"Error removing {manifest_path}: {e}")
+
+    if removed_count > 0:
+        print()
+        print(f"✓ Layer disabled ({removed_count} manifest files removed)")
+        print()
+        print("Note: You may also want to unset environment variables:")
+        print(f"  unset XR_ENABLE_API_LAYERS")
+        print(f"  unset DISABLE_{LAYER_NAME}")
+    else:
+        print("Layer not found in any standard location")
+        print()
+        print("Checked directories:")
+        for location in search_locations:
+            print(f"  - {location}")
+
+def main():
+    print(f"OpenXR API Layer Uninstaller")
+    print("=" * 60)
+    print()
+
+    # Platform-specific removal
+    if sys.platform == 'win32':
+        disable_layer_windows()
+    else:  # Linux, macOS, etc.
+        disable_layer_linux()
+
+if __name__ == "__main__":
+    main()
