@@ -56,7 +56,7 @@ def generate_layer_gen_c(parser):
 		resolutions.append(f"""    // Resolve {func}
 	result = ctx->next_get_instance_proc_addr(ctx->instance, "{func}", (PFN_xrVoidFunction*)&ctx->{func});
 	if (XR_FAILED(result)) {{
-		fprintf(stderr, "%s: Failed to resolve {func}\\n", LAYER_NAME);
+		fprintf(stderr, "%s: Failed to resolve %s\\n", LAYER_NAME, "{func}");
 		return result;
 	}}""")
 

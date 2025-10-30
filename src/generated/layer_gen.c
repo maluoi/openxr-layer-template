@@ -17,31 +17,31 @@ XrResult resolve_generated_functions(layer_context_t* ctx) {
     // Resolve xrCreateSession
 	result = ctx->next_get_instance_proc_addr(ctx->instance, "xrCreateSession", (PFN_xrVoidFunction*)&ctx->xrCreateSession);
 	if (XR_FAILED(result)) {
-		fprintf(stderr, "%s: Failed to resolve xrCreateSession\n", LAYER_NAME);
+		fprintf(stderr, "%s: Failed to resolve %s\n", LAYER_NAME, "xrCreateSession");
 		return result;
 	}
     // Resolve xrDestroyInstance
 	result = ctx->next_get_instance_proc_addr(ctx->instance, "xrDestroyInstance", (PFN_xrVoidFunction*)&ctx->xrDestroyInstance);
 	if (XR_FAILED(result)) {
-		fprintf(stderr, "%s: Failed to resolve xrDestroyInstance\n", LAYER_NAME);
+		fprintf(stderr, "%s: Failed to resolve %s\n", LAYER_NAME, "xrDestroyInstance");
 		return result;
 	}
     // Resolve xrGetInstanceProperties
 	result = ctx->next_get_instance_proc_addr(ctx->instance, "xrGetInstanceProperties", (PFN_xrVoidFunction*)&ctx->xrGetInstanceProperties);
 	if (XR_FAILED(result)) {
-		fprintf(stderr, "%s: Failed to resolve xrGetInstanceProperties\n", LAYER_NAME);
+		fprintf(stderr, "%s: Failed to resolve %s\n", LAYER_NAME, "xrGetInstanceProperties");
 		return result;
 	}
     // Resolve xrGetSystem
 	result = ctx->next_get_instance_proc_addr(ctx->instance, "xrGetSystem", (PFN_xrVoidFunction*)&ctx->xrGetSystem);
 	if (XR_FAILED(result)) {
-		fprintf(stderr, "%s: Failed to resolve xrGetSystem\n", LAYER_NAME);
+		fprintf(stderr, "%s: Failed to resolve %s\n", LAYER_NAME, "xrGetSystem");
 		return result;
 	}
     // Resolve xrGetSystemProperties
 	result = ctx->next_get_instance_proc_addr(ctx->instance, "xrGetSystemProperties", (PFN_xrVoidFunction*)&ctx->xrGetSystemProperties);
 	if (XR_FAILED(result)) {
-		fprintf(stderr, "%s: Failed to resolve xrGetSystemProperties\n", LAYER_NAME);
+		fprintf(stderr, "%s: Failed to resolve %s\n", LAYER_NAME, "xrGetSystemProperties");
 		return result;
 	}
 
